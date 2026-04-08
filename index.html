@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Каталог книг</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #fef9e6; }
+        .card { background: white; padding: 15px; margin-bottom: 20px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        input, select, button, textarea { margin: 5px; padding: 8px; border-radius: 6px; border: 1px solid #ccc; }
+        button { background: #2c7da0; color: white; border: none; cursor: pointer; }
+        button:hover { background: #1f5068; }
+        .item { padding: 5px 0; border-bottom: 1px solid #eee; }
+        h2, h3 { margin-top: 0; }
+        hr { margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <h1>📚 Каталог книг</h1>
+
+    <!-- 1) Издательства -->
+    <div class="card">
+        <h2>🏢 Издательства</h2>
+        <div id="publishersList"></div>
+        <input type="text" id="publisherName" placeholder="Наименование издательства">
+        <input type="text" id="publisherDesc" placeholder="Описание">
+        <button onclick="addPublisher()">➕ Добавить издательство</button>
+    </div>
+
+    <!-- 2) Книги -->
+    <div class="card">
+        <h2>📖 Книги</h2>
+        <div id="booksList"></div>
+        <input type="text" id="bookName" placeholder="Наименование книги">
+        <input type="text" id="bookDesc" placeholder="Описание">
+        <select id="bookPublisher"></select>
+        <input type="date" id="bookDate">
+        <button onclick="addBook()">➕ Добавить книгу</button>
+    </div>
+
+    <!-- 3) Экземпляры -->
+    <div class="card">
+        <h2>📕 Экземпляры</h2>
+        <div id="instancesList"></div>
+        <input type="text" id="instanceDesc" placeholder="Состояние, переплёт">
+        <select id="instanceBook"></select>
+        <input type="number" id="instanceCount" placeholder="Доступное количество" min="0" value="1">
+        <button onclick="addInstance()">➕ Добавить экземпляр</button>
+    </div>
+
+    <script>
+        // Типы данных
+        let publishers = [];   // id, наименование, описание
+        let books = [];        // id, наименование, описание, publisherId, date
+        let instances = [];    // id, описание (состояние, переплет), bookId, availableCount
+
+        // Вспомогательные функции
+        function getPublisherName(publisherId) {
+            let pub = publishers.find(p => p.id == publisherId);
+            return pub ? pub.name : '❓ Неизвестное издательство';
+        }
+
+        function getBookName(bookId) {
+            let book = books.find(b => b.id == bookId);
+            return book ? book.name : '❓ Неизвестная книга';
+        }
+
+        // Отрисовка всего интерфейса
+        function renderAll() {
+            // --- Издательства ---
+            const publishersDiv = document.getElementById('publishersList');
+            if (publishers.length === 0) {
+                publishersDiv.innerHTML = '<div class="item">📭 Нет издательств. Добавьте первое.</div>';
+            } else {
+                publishersDiv.innerHTML = publishers.map(p => `
+                    <div class="item">
+                        🏛️ <strong>${escapeHtml(p.name)}</strong> 
+                        ${p.description ? `— ${escapeHtml(p.description)}` : ''}
+                    </div>
+                `).join('');
+            }
+
+            // Обновляем выпадающий список издательств в карточке Книги
+            const publisherSelect = document.getElementById('bookPublisher');
+            publisherSelect.innerHTML = publishers.map(p => 
+                `<option value="${p.id}">${escapeHtml(p.name)}</option>`
+            ).join('');
+            if (publishers.length === 0) {
+                publisherSelect.innerHTML = '<option disabled>Сначала добавьте издательство</option>';
+            }
+
+            // --- Книги ---
+            const booksDiv = document.getElementById('booksList');
+            if (books.length === 0) {
+                booksDiv.innerHTML = '<div class="item">📭 Нет книг. Добавьте первую.</div>';
+            } else {
+                booksDiv.innerHTML = books.map(b => `
+                    <div class="item">
+                        📘 <strong>${escapeHtml(b.name)}</strong><br>
+                        📝 Описание: ${escapeHtml(b.description || '—')}<br>
+                        🏢 Издательство: ${getPublisherName(b.publisherId)}<br>
+                        📅 Дата издания: ${b.publishDate || 'не указана'}
+                    </div>
+                `).join('');
+            }
+
+            // Обновляем выпадающий список книг для экземпляров
+            const bookSelect = document.getElementById('instanceBook');
+            bookSelect.innerHTML = books.map(b => 
+                `<option value="${b.id}">${escapeHtml(b.name)}</option>`
+            ).join('');
+            if (books.length === 0) {
+                bookSelect.innerHTML = '<option disabled>Сначала добавьте книгу</option>';
+            }
+
+            // --- Экземпляры ---
+            const instancesDiv = document.getElementById('instancesList');
+            if (instances.length === 0) {
+                instancesDiv.innerHTML = '<div class="item">📭 Нет экземпляров. Добавьте первый.</div>';
+            } else {
+                instancesDiv.innerHTML = instances.map(inst => {
+                    const bookName = getBookName(inst.bookId);
+                    return `
+                        <div class="item">
+                            🎴 <strong>${escapeHtml(inst.description || 'Без описания')}</strong><br>
+                            📖 Книга: ${bookName}<br>
+                            📊 Доступно: ${inst.availableCount} шт.
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        // Безопасное экранирование
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
+        // 1) Добавление издательства
+        function addPublisher() {
+            let name = document.getElementById('publisherName').value.trim();
+            let desc = document.getElementById('publisherDesc').value.trim();
+            if (!name) {
+                alert('Введите наименование издательства');
+                return;
+            }
+            publishers.push({
+                id: Date.now(),
+                name: name,
+                description: desc
+            });
+            document.getElementById('publisherName').value = '';
+            document.getElementById('publisherDesc').value = '';
+            renderAll();
+        }
+
+        // 2) Добавление книги
+        function addBook() {
+            let name = document.getElementById('bookName').value.trim();
+            let desc = document.getElementById('bookDesc').value.trim();
+            let publisherId = parseInt(document.getElementById('bookPublisher').value);
+            let publishDate = document.getElementById('bookDate').value;
+
+            if (!name) {
+                alert('Введите наименование книги');
+                return;
+            }
+            if (!publisherId || isNaN(publisherId) || !publishers.find(p => p.id === publisherId)) {
+                alert('Выберите корректное издательство');
+                return;
+            }
+
+            books.push({
+                id: Date.now(),
+                name: name,
+                description: desc,
+                publisherId: publisherId,
+                publishDate: publishDate
+            });
+
+            document.getElementById('bookName').value = '';
+            document.getElementById('bookDesc').value = '';
+            document.getElementById('bookDate').value = '';
+            renderAll();
+        }
+
+        // 3) Добавление экземпляра
+        function addInstance() {
+            let description = document.getElementById('instanceDesc').value.trim();
+            let bookId = parseInt(document.getElementById('instanceBook').value);
+            let availableCount = parseInt(document.getElementById('instanceCount').value);
+
+            if (!bookId || isNaN(bookId) || !books.find(b => b.id === bookId)) {
+                alert('Выберите книгу из списка');
+                return;
+            }
+            if (isNaN(availableCount) || availableCount < 0) {
+                alert('Введите корректное количество (0 или больше)');
+                return;
+            }
+            if (!description) {
+                alert('Введите описание экземпляра (состояние, переплёт)');
+                return;
+            }
+
+            instances.push({
+                id: Date.now(),
+                description: description,
+                bookId: bookId,
+                availableCount: availableCount
+            });
+
+            document.getElementById('instanceDesc').value = '';
+            document.getElementById('instanceCount').value = '1';
+            renderAll();
+        }
+
+        // Начальная отрисовка (пока всё пусто)
+        renderAll();
+    </script>
+</body>
+</html>
