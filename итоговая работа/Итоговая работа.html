@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Каталог книг</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+<div id="app"></div>
+
+<nav class="navbar navbar-dark bg-dark fixed-top">
+    <div class="container-fluid">
+        <span class="navbar-brand">📚 Каталог книг</span>
+    </div>
+</nav>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+<script>
+const { createApp, ref } = Vue;
+
+createApp({
+setup() {
+
+    const publishers = ref([
+        { id: 1, name: "Эксмо", description: "Крупное издательство" },
+        { id: 2, name: "Питер", description: "Учебная литература" }
+    ]);
+
+    const books = ref([
+        { id: 1, name: "JavaScript", description: "Учебник", publisherId: 2, date: "2022" }
+    ]);
+
+    const copies = ref([
+        { id: 1, description: "Твердый", bookId: 1, count: 5 }
+    ]);
+
+    const editBookId = ref(null);
+    const editCopyId = ref(null);
+
+    const newBook = ref({ name: "", description: "", publisherId: "", date: "" });
+    const newCopy = ref({ description: "", bookId: "", count: 1 });
+
+    const addBook = () => {
+        books.value.push({ id: Date.now(), ...newBook.value });
+        newBook.value = { name: "", description: "", publisherId: "", date: "" };
+    };
+
+    const deleteBook = (id) => {
+        books.value = books.value.filter(b => b.id !== id);
+        copies.value = copies.value.filter(c => c.bookId !== id);
+    };
+
+    const editBook = (book) => {
+        editBookId.value = book.id;
+        newBook.value = { ...book };
+    };
+
+    const updateBook = () => {
+        const index = books.value.findIndex(b => b.id === editBookId.value);
+        books.value[index] = { ...newBook.value };
+
+        editBookId.value = null;
+        newBook.value = { name: "", description: "", publisherId: "", date: "" };
+    };
+
+    const addCopy = () => {
+        copies.value.push({ id: Date.now(), ...newCopy.value });
+        newCopy.value = { description: "", bookId: "", count: 1 };
+    };
+
+    const deleteCopy = (id) => {
+        copies.value = copies.value.filter(c => c.id !== id);
+    };
+
+    const editCopy = (copy) => {
+        editCopyId.value = copy.id;
+        newCopy.value = { ...copy };
+    };
+
+    const updateCopy = () => {
+        const index = copies.value.findIndex(c => c.id === editCopyId.value);
+        copies.value[index] = { ...newCopy.value };
+
+        editCopyId.value = null;
+        newCopy.value = { description: "", bookId: "", count: 1 };
+    };
+
+    const getPublisherName = (id) => {
+        return publishers.value.find(p => p.id == id)?.name || "—";
+    };
+
+    const getCopiesByBook = (bookId) => {
+        return copies.value.filter(c => c.bookId == bookId);
+    };
+
+    return {
+        publishers, books, copies,
+        newBook, newCopy,
+        addBook, deleteBook, editBook, updateBook,
+        addCopy, deleteCopy, editCopy, updateCopy,
+        editBookId, editCopyId,
+        getPublisherName, getCopiesByBook
+    };
+},
+
+template: `
+<div class="container mt-5 pt-4">
+
+<h1 class="text-center mb-4">Каталог книг</h1>
+
+<!-- КНИГА -->
+<div class="card mb-4 p-3">
+<h5>{{ editBookId ? "Редактировать книгу" : "Добавить книгу" }}</h5>
+
+<input v-model="newBook.name" class="form-control mb-2" placeholder="Название">
+<input v-model="newBook.description" class="form-control mb-2" placeholder="Описание">
+
+<select v-model="newBook.publisherId" class="form-control mb-2">
+<option disabled value="">Издательство</option>
+<option v-for="p in publishers" :value="p.id">{{ p.name }}</option>
+</select>
+
+<input v-model="newBook.date" class="form-control mb-2" placeholder="Дата">
+
+<button v-if="!editBookId" @click="addBook" class="btn btn-primary">Добавить</button>
+<button v-else @click="updateBook" class="btn btn-warning">Сохранить</button>
+</div>
+
+<!-- ЭКЗЕМПЛЯР -->
+<div class="card mb-4 p-3">
+<h5>{{ editCopyId ? "Редактировать экземпляр" : "Добавить экземпляр" }}</h5>
+
+<input v-model="newCopy.description" class="form-control mb-2" placeholder="Описание">
+
+<select v-model="newCopy.bookId" class="form-control mb-2">
+<option disabled value="">Книга</option>
+<option v-for="b in books" :value="b.id">{{ b.name }}</option>
+</select>
+
+<input type="number" v-model="newCopy.count" class="form-control mb-2">
+
+<button v-if="!editCopyId" @click="addCopy" class="btn btn-success">Добавить</button>
+<button v-else @click="updateCopy" class="btn btn-warning">Сохранить</button>
+</div>
+
+<!-- СПИСОК -->
+<div class="row">
+<div class="col-md-6 mb-4" v-for="book in books" :key="book.id">
+<div class="card p-3">
+
+<h4>{{ book.name }}</h4>
+<p>{{ book.description }}</p>
+
+<p><b>Издательство:</b> {{ getPublisherName(book.publisherId) }}</p>
+<p><b>Дата:</b> {{ book.date }}</p>
+
+<button class="btn btn-sm btn-warning me-2" @click="editBook(book)">✏️</button>
+<button class="btn btn-sm btn-danger" @click="deleteBook(book.id)">🗑</button>
+
+<hr>
+
+<h6>Экземпляры:</h6>
+<ul>
+<li v-for="copy in getCopiesByBook(book.id)">
+{{ copy.description }} — {{ copy.count }}
+
+<button class="btn btn-sm btn-outline-warning ms-2" @click="editCopy(copy)">✏️</button>
+<button class="btn btn-sm btn-outline-danger" @click="deleteCopy(copy.id)">🗑</button>
+</li>
+</ul>
+
+</div>
+</div>
+</div>
+
+</div>
+`
+}).mount('#app');
+</script>
+
+</body>
+</html>
